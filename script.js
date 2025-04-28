@@ -1,4 +1,3 @@
-// Calculator Logic (unchanged)
 let display = document.getElementById("display");
 
 function appendToDisplay(value) {
@@ -22,7 +21,6 @@ function calculate() {
     }
 }
 
-// RPG Game Logic with all new features
 function startGame() {
     document.body.innerHTML = `
         <div class="game">
@@ -54,6 +52,46 @@ function startGame() {
         coins: []
     };
 
+    // Generate World
+    function generateWorld() {
+        // Trees
+        for (let i = 0; i < 100; i++) {
+            assets.trees.push({
+                x: Math.random() * worldSize.width,
+                y: Math.random() * worldSize.height,
+                size: 15 + Math.random() * 20
+            });
+        }
+        
+        // Rocks
+        for (let i = 0; i < 60; i++) {
+            assets.rocks.push({
+                x: Math.random() * worldSize.width,
+                y: Math.random() * worldSize.height,
+                size: 10 + Math.random() * 30
+            });
+        }
+        
+        // Lakes
+        for (let i = 0; i < 8; i++) {
+            assets.lakes.push({
+                x: Math.random() * (worldSize.width - 300),
+                y: Math.random() * (worldSize.height - 300),
+                width: 100 + Math.random() * 200,
+                height: 100 + Math.random() * 200
+            });
+        }
+        
+        // Coins
+        for (let i = 0; i < 30; i++) {
+            assets.coins.push({
+                x: Math.random() * worldSize.width,
+                y: Math.random() * worldSize.height,
+                collected: false
+            });
+        }
+    }
+
     // Safe House
     const safeHouse = {
         x: worldSize.width * 0.7,
@@ -61,7 +99,7 @@ function startGame() {
         width: 120,
         height: 100,
         safeRadius: 150,
-        noEnemyRadius: 250 // Enemies avoid this area
+        noEnemyRadius: 250
     };
 
     // Player
@@ -74,7 +112,7 @@ function startGame() {
         score: 0,
         isSafe: false,
         healTimer: 0,
-        coinCollectionRange: 50 // Auto-collect coins within this range
+        coinCollectionRange: 50
     };
 
     // Enemies
@@ -85,16 +123,9 @@ function startGame() {
         { color: "#e67e22", speed: 1, health: 3, size: 30, viewRange: 180 }
     ];
 
-    // Generate World
-    function generateWorld() {
-        // Generate trees, rocks, lakes (same as before)
-        // Generate coins (same as before)
-    }
-
     function spawnEnemy() {
         let x, y, validPosition;
         
-        // Ensure enemies spawn away from safe house
         do {
             x = Math.random() * worldSize.width;
             y = Math.random() * worldSize.height;
@@ -115,7 +146,9 @@ function startGame() {
             maxHealth: type.health,
             speed: type.speed,
             viewRange: type.viewRange,
-            isActive: false
+            isActive: false,
+            originalX: x,
+            originalY: y
         });
     }
 
@@ -123,7 +156,21 @@ function startGame() {
     generateWorld();
     for (let i = 0; i < 12; i++) spawnEnemy();
 
-    // Controls (same as before)
+    // Controls
+    const keys = {};
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "8") keys.up = true;
+        if (e.key === "4") keys.left = true;
+        if (e.key === "5") keys.down = true;
+        if (e.key === "6") keys.right = true;
+    });
+
+    document.addEventListener("keyup", (e) => {
+        if (e.key === "8") keys.up = false;
+        if (e.key === "4") keys.left = false;
+        if (e.key === "5") keys.down = false;
+        if (e.key === "6") keys.right = false;
+    });
 
     function updateUI() {
         document.getElementById("score").textContent = player.score;
@@ -131,13 +178,149 @@ function startGame() {
     }
 
     function drawWorld() {
-        // Draw world elements (same as before)
+        // Draw background
+        ctx.fillStyle = "#ecf0f1";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw lakes
+        ctx.fillStyle = "#3498db";
+        assets.lakes.forEach(lake => {
+            if (isVisible(lake)) {
+                ctx.fillRect(
+                    lake.x - viewport.x,
+                    lake.y - viewport.y,
+                    lake.width,
+                    lake.height
+                );
+            }
+        });
+
+        // Draw trees
+        assets.trees.forEach(tree => {
+            if (isVisible(tree)) {
+                // Trunk
+                ctx.fillStyle = "#8b4513";
+                ctx.fillRect(
+                    tree.x - viewport.x - 3,
+                    tree.y - viewport.y + tree.size/2,
+                    6,
+                    tree.size
+                );
+                
+                // Leaves
+                ctx.fillStyle = "#2ecc71";
+                ctx.beginPath();
+                ctx.arc(
+                    tree.x - viewport.x,
+                    tree.y - viewport.y,
+                    tree.size/2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        });
+
+        // Draw rocks
+        ctx.fillStyle = "#7f8c8d";
+        assets.rocks.forEach(rock => {
+            if (isVisible(rock)) {
+                ctx.beginPath();
+                ctx.arc(
+                    rock.x - viewport.x,
+                    rock.y - viewport.y,
+                    rock.size/2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        });
+
+        // Draw coins
+        assets.coins.forEach(coin => {
+            if (!coin.collected && isVisible({x: coin.x, y: coin.y, size: 10})) {
+                ctx.fillStyle = "#f1c40f";
+                ctx.beginPath();
+                ctx.arc(
+                    coin.x - viewport.x,
+                    coin.y - viewport.y,
+                    10,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+                
+                ctx.fillStyle = "#e67e22";
+                ctx.beginPath();
+                ctx.arc(
+                    coin.x - viewport.x,
+                    coin.y - viewport.y,
+                    6,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        });
+
+        // Draw safe house
+        const houseColor = player.isSafe ? "#16a085" : "#1abc9c";
+        ctx.fillStyle = houseColor;
+        ctx.fillRect(
+            safeHouse.x - viewport.x - safeHouse.width/2,
+            safeHouse.y - viewport.y - safeHouse.height/2,
+            safeHouse.width,
+            safeHouse.height
+        );
+        
+        // Draw roof
+        ctx.fillStyle = "#c0392b";
+        ctx.beginPath();
+        ctx.moveTo(safeHouse.x - viewport.x - safeHouse.width/2, safeHouse.y - viewport.y - safeHouse.height/2);
+        ctx.lineTo(safeHouse.x - viewport.x, safeHouse.y - viewport.y - safeHouse.height);
+        ctx.lineTo(safeHouse.x - viewport.x + safeHouse.width/2, safeHouse.y - viewport.y - safeHouse.height/2);
+        ctx.fill();
+
+        // Draw door
+        ctx.fillStyle = "#8b4513";
+        ctx.fillRect(
+            safeHouse.x - viewport.x - 15,
+            safeHouse.y - viewport.y + 20,
+            30,
+            50
+        );
+
+        // Draw safe radius
+        if (player.isSafe) {
+            ctx.strokeStyle = "#2ecc71";
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(
+                safeHouse.x - viewport.x,
+                safeHouse.y - viewport.y,
+                safeHouse.safeRadius,
+                0,
+                Math.PI * 2
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    }
+
+    function isVisible(obj) {
+        return (
+            obj.x + obj.size > viewport.x &&
+            obj.x - obj.size < viewport.x + viewport.width &&
+            obj.y + obj.size > viewport.y &&
+            obj.y - obj.size < viewport.y + viewport.height
+        );
     }
 
     function gameLoop() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Update viewport to follow player
+        // Update viewport
         viewport.x = player.x - canvas.width / 2;
         viewport.y = player.y - canvas.height / 2;
         viewport.x = Math.max(0, Math.min(worldSize.width - viewport.width, viewport.x));
@@ -168,7 +351,7 @@ function startGame() {
         document.getElementById("safeStatus").style.color = 
             player.isSafe ? "#2ecc71" : "#e74c3c";
 
-        // Auto-collect coins when near
+        // Auto-collect coins
         assets.coins.forEach((coin, index) => {
             if (!coin.collected) {
                 const dist = Math.sqrt(
@@ -183,7 +366,7 @@ function startGame() {
             }
         });
 
-        // Update and draw enemies
+        // Update enemies
         enemies.forEach(enemy => {
             const distToPlayer = Math.sqrt(
                 Math.pow(player.x - enemy.x, 2) + 
@@ -195,7 +378,7 @@ function startGame() {
                 Math.pow(enemy.y - safeHouse.y, 2)
             );
 
-            // Enemy stays away from house
+            // Stay away from house
             if (distToHouse < safeHouse.noEnemyRadius) {
                 const angle = Math.atan2(
                     enemy.y - safeHouse.y, 
@@ -204,8 +387,17 @@ function startGame() {
                 enemy.x += Math.cos(angle) * enemy.speed;
                 enemy.y += Math.sin(angle) * enemy.speed;
             }
-            // Enemy only chases if player is in view range and not in safe zone
-            else if (distToPlayer < enemy.viewRange && !player.isSafe) {
+            // Return to original position if player not in view
+            else if (distToPlayer > enemy.viewRange || player.isSafe) {
+                const angle = Math.atan2(
+                    enemy.originalY - enemy.y, 
+                    enemy.originalX - enemy.x
+                );
+                enemy.x += Math.cos(angle) * enemy.speed * 0.3;
+                enemy.y += Math.sin(angle) * enemy.speed * 0.3;
+            }
+            // Chase player if in view range
+            else {
                 const angle = Math.atan2(
                     player.y - enemy.y, 
                     player.x - enemy.x
@@ -213,17 +405,43 @@ function startGame() {
                 enemy.x += Math.cos(angle) * enemy.speed;
                 enemy.y += Math.sin(angle) * enemy.speed;
                 
-                // Check for player collision (attack)
+                // Attack if touching player
                 if (distToPlayer < player.size + enemy.size) {
                     player.health = Math.max(0, player.health - 0.5);
                     updateUI();
                 }
             }
 
-            // Draw enemy (same as before)
+            // Draw enemy
+            ctx.fillStyle = enemy.color;
+            ctx.beginPath();
+            ctx.arc(
+                enemy.x - viewport.x,
+                enemy.y - viewport.y,
+                enemy.size,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+
+            // Health bar
+            ctx.fillStyle = "#000";
+            ctx.fillRect(
+                enemy.x - viewport.x - enemy.size,
+                enemy.y - viewport.y - enemy.size - 10,
+                enemy.size * 2,
+                5
+            );
+            ctx.fillStyle = "#e74c3c";
+            ctx.fillRect(
+                enemy.x - viewport.x - enemy.size,
+                enemy.y - viewport.y - enemy.size - 10,
+                (enemy.size * 2) * (enemy.health / enemy.maxHealth),
+                5
+            );
         });
 
-        // Heal player when safe
+        // Heal when safe
         if (player.isSafe && player.health < 100) {
             player.health = Math.min(100, player.health + 0.1);
             updateUI();
