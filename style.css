@@ -68,6 +68,11 @@ button:active {
 }
 
 /* Game Styles */
+.game {
+    text-align: center;
+    padding: 20px;
+}
+
 .game-container {
     position: relative;
     width: 800px;
@@ -106,6 +111,13 @@ button:active {
 .stats {
     display: flex;
     gap: 20px;
+    align-items: center;
+}
+
+#safeStatus {
+    margin-left: 20px;
+    font-weight: bold;
+    transition: color 0.3s;
 }
 
 #gameCanvas {
