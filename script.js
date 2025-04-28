@@ -32,6 +32,7 @@ function startGame() {
                 <div class="stats">
                     <span>Score: <span id="score">0</span></span>
                     <span>Health: <span id="health">100</span>%</span>
+                    <span id="safeStatus">DANGER</span>
                 </div>
                 <button onclick="location.reload()">Exit to Calculator</button>
             </div>
@@ -94,6 +95,15 @@ function startGame() {
         }
     }
 
+    // Safe House
+    const safeHouse = {
+        x: worldSize.width * 0.7,
+        y: worldSize.height * 0.7,
+        width: 120,
+        height: 100,
+        safeRadius: 150
+    };
+
     // Player
     const player = {
         x: worldSize.width / 2,
@@ -102,7 +112,9 @@ function startGame() {
         speed: 5,
         health: 100,
         score: 0,
-        lastAttack: 0
+        lastAttack: 0,
+        isSafe: false,
+        healTimer: 0
     };
 
     // Enemies
@@ -122,7 +134,8 @@ function startGame() {
             color: type.color,
             health: type.health,
             maxHealth: type.health,
-            speed: type.speed
+            speed: type.speed,
+            lastDirectionChange: 0
         });
     }
 
@@ -155,6 +168,8 @@ function startGame() {
     });
 
     canvas.addEventListener("click", (e) => {
+        if (player.isSafe) return;
+        
         const now = Date.now();
         if (now - player.lastAttack < 300) return;
         player.lastAttack = now;
@@ -199,6 +214,10 @@ function startGame() {
     }
 
     function drawWorld() {
+        // Draw background
+        ctx.fillStyle = "#ecf0f1";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         // Draw lakes
         ctx.fillStyle = "#3498db";
         assets.lakes.forEach(lake => {
@@ -280,6 +299,49 @@ function startGame() {
                 ctx.fill();
             }
         });
+
+        // Draw safe house
+        const houseColor = player.isSafe ? "#16a085" : "#1abc9c";
+        ctx.fillStyle = houseColor;
+        ctx.fillRect(
+            safeHouse.x - viewport.x - safeHouse.width/2,
+            safeHouse.y - viewport.y - safeHouse.height/2,
+            safeHouse.width,
+            safeHouse.height
+        );
+        
+        // Draw roof
+        ctx.fillStyle = "#c0392b";
+        ctx.beginPath();
+        ctx.moveTo(safeHouse.x - viewport.x - safeHouse.width/2, safeHouse.y - viewport.y - safeHouse.height/2);
+        ctx.lineTo(safeHouse.x - viewport.x, safeHouse.y - viewport.y - safeHouse.height);
+        ctx.lineTo(safeHouse.x - viewport.x + safeHouse.width/2, safeHouse.y - viewport.y - safeHouse.height/2);
+        ctx.fill();
+
+        // Draw door
+        ctx.fillStyle = "#8b4513";
+        ctx.fillRect(
+            safeHouse.x - viewport.x - 15,
+            safeHouse.y - viewport.y + 20,
+            30,
+            50
+        );
+
+        // Draw safe radius (visual indicator)
+        if (player.isSafe) {
+            ctx.strokeStyle = "#2ecc71";
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(
+                safeHouse.x - viewport.x,
+                safeHouse.y - viewport.y,
+                safeHouse.safeRadius,
+                0,
+                Math.PI * 2
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
 
     function isVisible(obj) {
@@ -303,14 +365,39 @@ function startGame() {
         // Draw world
         drawWorld();
 
-        // Update player
+        // Update player position
         if (keys.up) player.y -= player.speed;
         if (keys.left) player.x -= player.speed;
         if (keys.down) player.y += player.speed;
         if (keys.right) player.x += player.speed;
 
+        // Boundary check
         player.x = Math.max(player.size, Math.min(worldSize.width - player.size, player.x));
         player.y = Math.max(player.size, Math.min(worldSize.height - player.size, player.y));
+
+        // Safe house logic
+        const distToHouse = Math.sqrt(
+            Math.pow(player.x - safeHouse.x, 2) + 
+            Math.pow(player.y - safeHouse.y, 2)
+        );
+        
+        player.isSafe = distToHouse < safeHouse.safeRadius;
+        document.getElementById("safeStatus").textContent = 
+            player.isSafe ? "SAFE" : "DANGER";
+        document.getElementById("safeStatus").style.color = 
+            player.isSafe ? "#2ecc71" : "#e74c3c";
+
+        // Heal player when safe
+        if (player.isSafe) {
+            player.healTimer++;
+            if (player.healTimer > 60 && player.health < 100) {
+                player.health++;
+                updateUI();
+                player.healTimer = 0;
+            }
+        } else {
+            player.healTimer = 0;
+        }
 
         // Draw player
         ctx.fillStyle = "#3498db";
@@ -325,11 +412,27 @@ function startGame() {
         ctx.fill();
 
         // Update and draw enemies
+        const now = Date.now();
         enemies.forEach(enemy => {
-            // AI: Move toward player
-            const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-            enemy.x += Math.cos(angle) * enemy.speed;
-            enemy.y += Math.sin(angle) * enemy.speed;
+            // AI behavior
+            if (!player.isSafe) {
+                // Chase player when not in safe zone
+                const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                enemy.x += Math.cos(angle) * enemy.speed;
+                enemy.y += Math.sin(angle) * enemy.speed;
+            } else {
+                // Wander randomly when player is safe
+                if (now - enemy.lastDirectionChange > 2000) {
+                    enemy.randomAngle = Math.random() * Math.PI * 2;
+                    enemy.lastDirectionChange = now;
+                }
+                enemy.x += Math.cos(enemy.randomAngle) * enemy.speed * 0.5;
+                enemy.y += Math.sin(enemy.randomAngle) * enemy.speed * 0.5;
+                
+                // Keep enemies in bounds
+                enemy.x = Math.max(enemy.size, Math.min(worldSize.width - enemy.size, enemy.x));
+                enemy.y = Math.max(enemy.size, Math.min(worldSize.height - enemy.size, enemy.y));
+            }
 
             // Draw enemy
             ctx.fillStyle = enemy.color;
