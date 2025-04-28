@@ -164,4 +164,205 @@ function startGame() {
             const dist = Math.sqrt(
                 Math.pow(mouse.x - enemy.x, 2) + 
                 Math.pow(mouse.y - enemy.y, 2)
-           
+            );
+            
+            if (dist < enemy.size) {
+                enemy.health--;
+                if (enemy.health <= 0) {
+                    player.score += 10;
+                    enemies.splice(index, 1);
+                    spawnEnemy();
+                }
+                updateUI();
+            }
+        });
+
+        // Collect coins
+        assets.coins.forEach((coin, index) => {
+            if (!coin.collected) {
+                const dist = Math.sqrt(
+                    Math.pow(mouse.x - coin.x, 2) + 
+                    Math.pow(mouse.y - coin.y, 2)
+                );
+                if (dist < 30) {
+                    coin.collected = true;
+                    player.score += 5;
+                    updateUI();
+                }
+            }
+        });
+    });
+
+    function updateUI() {
+        document.getElementById("score").textContent = player.score;
+        document.getElementById("health").textContent = player.health;
+    }
+
+    function drawWorld() {
+        // Draw lakes
+        ctx.fillStyle = "#3498db";
+        assets.lakes.forEach(lake => {
+            if (isVisible(lake)) {
+                ctx.fillRect(
+                    lake.x - viewport.x,
+                    lake.y - viewport.y,
+                    lake.width,
+                    lake.height
+                );
+            }
+        });
+
+        // Draw trees
+        assets.trees.forEach(tree => {
+            if (isVisible(tree)) {
+                // Trunk
+                ctx.fillStyle = "#8b4513";
+                ctx.fillRect(
+                    tree.x - viewport.x - 3,
+                    tree.y - viewport.y + tree.size/2,
+                    6,
+                    tree.size
+                );
+                
+                // Leaves
+                ctx.fillStyle = "#2ecc71";
+                ctx.beginPath();
+                ctx.arc(
+                    tree.x - viewport.x,
+                    tree.y - viewport.y,
+                    tree.size/2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        });
+
+        // Draw rocks
+        ctx.fillStyle = "#7f8c8d";
+        assets.rocks.forEach(rock => {
+            if (isVisible(rock)) {
+                ctx.beginPath();
+                ctx.arc(
+                    rock.x - viewport.x,
+                    rock.y - viewport.y,
+                    rock.size/2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        });
+
+        // Draw coins
+        assets.coins.forEach(coin => {
+            if (!coin.collected && isVisible({x: coin.x, y: coin.y, size: 10})) {
+                ctx.fillStyle = "#f1c40f";
+                ctx.beginPath();
+                ctx.arc(
+                    coin.x - viewport.x,
+                    coin.y - viewport.y,
+                    10,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+                
+                ctx.fillStyle = "#e67e22";
+                ctx.beginPath();
+                ctx.arc(
+                    coin.x - viewport.x,
+                    coin.y - viewport.y,
+                    6,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        });
+    }
+
+    function isVisible(obj) {
+        return (
+            obj.x + obj.size > viewport.x &&
+            obj.x - obj.size < viewport.x + viewport.width &&
+            obj.y + obj.size > viewport.y &&
+            obj.y - obj.size < viewport.y + viewport.height
+        );
+    }
+
+    function gameLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Update viewport to follow player
+        viewport.x = player.x - canvas.width / 2;
+        viewport.y = player.y - canvas.height / 2;
+        viewport.x = Math.max(0, Math.min(worldSize.width - viewport.width, viewport.x));
+        viewport.y = Math.max(0, Math.min(worldSize.height - viewport.height, viewport.y));
+
+        // Draw world
+        drawWorld();
+
+        // Update player
+        if (keys.up) player.y -= player.speed;
+        if (keys.left) player.x -= player.speed;
+        if (keys.down) player.y += player.speed;
+        if (keys.right) player.x += player.speed;
+
+        player.x = Math.max(player.size, Math.min(worldSize.width - player.size, player.x));
+        player.y = Math.max(player.size, Math.min(worldSize.height - player.size, player.y));
+
+        // Draw player
+        ctx.fillStyle = "#3498db";
+        ctx.beginPath();
+        ctx.arc(
+            player.x - viewport.x,
+            player.y - viewport.y,
+            player.size,
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
+
+        // Update and draw enemies
+        enemies.forEach(enemy => {
+            // AI: Move toward player
+            const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+            enemy.x += Math.cos(angle) * enemy.speed;
+            enemy.y += Math.sin(angle) * enemy.speed;
+
+            // Draw enemy
+            ctx.fillStyle = enemy.color;
+            ctx.beginPath();
+            ctx.arc(
+                enemy.x - viewport.x,
+                enemy.y - viewport.y,
+                enemy.size,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+
+            // Health bar
+            ctx.fillStyle = "#000";
+            ctx.fillRect(
+                enemy.x - viewport.x - enemy.size,
+                enemy.y - viewport.y - enemy.size - 10,
+                enemy.size * 2,
+                5
+            );
+            ctx.fillStyle = "#e74c3c";
+            ctx.fillRect(
+                enemy.x - viewport.x - enemy.size,
+                enemy.y - viewport.y - enemy.size - 10,
+                (enemy.size * 2) * (enemy.health / enemy.maxHealth),
+                5
+            );
+        });
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    updateUI();
+    gameLoop();
+}
