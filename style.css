@@ -67,11 +67,7 @@ button:active {
     background: #ff6b5b;
 }
 
-.game {
-    text-align: center;
-    padding: 20px;
-}
-
+/* Game Styles */
 .game-container {
     position: relative;
     width: 800px;
@@ -81,6 +77,7 @@ button:active {
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    background: #ecf0f1;
 }
 
 .game-ui {
@@ -120,6 +117,5 @@ button:active {
 }
 
 #gameCanvas {
-    background: #ecf0f1;
     display: block;
 }
