@@ -1,3 +1,4 @@
+// Calculator Logic
 let display = document.getElementById("display");
 
 function appendToDisplay(value) {
@@ -21,6 +22,7 @@ function calculate() {
     }
 }
 
+// RPG Game Logic
 function startGame() {
     document.body.innerHTML = `
         <div class="game">
@@ -42,7 +44,7 @@ function startGame() {
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     const viewport = { x: 0, y: 0, width: 800, height: 800 };
-    const worldSize = { width: 2000, height: 2000 };
+    const worldSize = { width: 1600, height: 1600 };
 
     // Game Assets
     const assets = {
@@ -146,7 +148,6 @@ function startGame() {
             maxHealth: type.health,
             speed: type.speed,
             viewRange: type.viewRange,
-            isActive: false,
             originalX: x,
             originalY: y
         });
@@ -178,68 +179,62 @@ function startGame() {
     }
 
     function drawWorld() {
-        // Draw background
+        // Clear canvas
         ctx.fillStyle = "#ecf0f1";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Draw lakes
         ctx.fillStyle = "#3498db";
         assets.lakes.forEach(lake => {
-            if (isVisible(lake)) {
-                ctx.fillRect(
-                    lake.x - viewport.x,
-                    lake.y - viewport.y,
-                    lake.width,
-                    lake.height
-                );
-            }
+            ctx.fillRect(
+                lake.x - viewport.x,
+                lake.y - viewport.y,
+                lake.width,
+                lake.height
+            );
         });
 
         // Draw trees
         assets.trees.forEach(tree => {
-            if (isVisible(tree)) {
-                // Trunk
-                ctx.fillStyle = "#8b4513";
-                ctx.fillRect(
-                    tree.x - viewport.x - 3,
-                    tree.y - viewport.y + tree.size/2,
-                    6,
-                    tree.size
-                );
-                
-                // Leaves
-                ctx.fillStyle = "#2ecc71";
-                ctx.beginPath();
-                ctx.arc(
-                    tree.x - viewport.x,
-                    tree.y - viewport.y,
-                    tree.size/2,
-                    0,
-                    Math.PI * 2
-                );
-                ctx.fill();
-            }
+            // Trunk
+            ctx.fillStyle = "#8b4513";
+            ctx.fillRect(
+                tree.x - viewport.x - 3,
+                tree.y - viewport.y + tree.size/2,
+                6,
+                tree.size
+            );
+            
+            // Leaves
+            ctx.fillStyle = "#2ecc71";
+            ctx.beginPath();
+            ctx.arc(
+                tree.x - viewport.x,
+                tree.y - viewport.y,
+                tree.size/2,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
         });
 
         // Draw rocks
         ctx.fillStyle = "#7f8c8d";
         assets.rocks.forEach(rock => {
-            if (isVisible(rock)) {
-                ctx.beginPath();
-                ctx.arc(
-                    rock.x - viewport.x,
-                    rock.y - viewport.y,
-                    rock.size/2,
-                    0,
-                    Math.PI * 2
-                );
-                ctx.fill();
-            }
+            ctx.beginPath();
+            ctx.arc(
+                rock.x - viewport.x,
+                rock.y - viewport.y,
+                rock.size/2,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
         });
 
         // Draw coins
         assets.coins.forEach(coin => {
-            if (!coin.collected && isVisible({x: coin.x, y: coin.y, size: 10})) {
+            if (!coin.collected) {
                 ctx.fillStyle = "#f1c40f";
                 ctx.beginPath();
                 ctx.arc(
@@ -308,18 +303,7 @@ function startGame() {
         }
     }
 
-    function isVisible(obj) {
-        return (
-            obj.x + obj.size > viewport.x &&
-            obj.x - obj.size < viewport.x + viewport.width &&
-            obj.y + obj.size > viewport.y &&
-            obj.y - obj.size < viewport.y + viewport.height
-        );
-    }
-
     function gameLoop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
         // Update viewport
         viewport.x = player.x - canvas.width / 2;
         viewport.y = player.y - canvas.height / 2;
@@ -352,7 +336,7 @@ function startGame() {
             player.isSafe ? "#2ecc71" : "#e74c3c";
 
         // Auto-collect coins
-        assets.coins.forEach((coin, index) => {
+        assets.coins.forEach((coin) => {
             if (!coin.collected) {
                 const dist = Math.sqrt(
                     Math.pow(player.x - coin.x, 2) + 
@@ -393,8 +377,15 @@ function startGame() {
                     enemy.originalY - enemy.y, 
                     enemy.originalX - enemy.x
                 );
-                enemy.x += Math.cos(angle) * enemy.speed * 0.3;
-                enemy.y += Math.sin(angle) * enemy.speed * 0.3;
+                const moveDist = Math.min(
+                    Math.sqrt(
+                        Math.pow(enemy.originalX - enemy.x, 2) + 
+                        Math.pow(enemy.originalY - enemy.y, 2)
+                    ),
+                    enemy.speed * 0.3
+                );
+                enemy.x += Math.cos(angle) * moveDist;
+                enemy.y += Math.sin(angle) * moveDist;
             }
             // Chase player if in view range
             else {
