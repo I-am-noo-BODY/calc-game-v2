@@ -106,15 +106,17 @@ function startGame() {
 
     // Player
     const player = {
-        x: worldSize.width / 2,
-        y: worldSize.height / 2,
+        x: safeHouse.x,
+        y: safeHouse.y,
         size: 20,
         speed: 5,
         health: 100,
         score: 0,
-        isSafe: false,
+        isSafe: true,
         healTimer: 0,
-        coinCollectionRange: 50
+        coinCollectionRange: 50,
+        isAlive: true,
+        respawnTimer: 0
     };
 
     // Enemies
@@ -176,6 +178,40 @@ function startGame() {
     function updateUI() {
         document.getElementById("score").textContent = player.score;
         document.getElementById("health").textContent = player.health;
+    }
+
+    function drawPlayer() {
+        if (!player.isAlive) return;
+        
+        ctx.fillStyle = "#3498db";
+        ctx.beginPath();
+        ctx.arc(
+            player.x - viewport.x,
+            player.y - viewport.y,
+            player.size,
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
+        
+        // Draw player eyes
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(
+            player.x - viewport.x - 5,
+            player.y - viewport.y - 3,
+            3,
+            0,
+            Math.PI * 2
+        );
+        ctx.arc(
+            player.x - viewport.x + 5,
+            player.y - viewport.y - 3,
+            3,
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
     }
 
     function drawWorld() {
@@ -303,6 +339,15 @@ function startGame() {
         }
     }
 
+    function respawnPlayer() {
+        player.x = safeHouse.x;
+        player.y = safeHouse.y;
+        player.health = 100;
+        player.isAlive = true;
+        player.isSafe = true;
+        updateUI();
+    }
+
     function gameLoop() {
         // Update viewport
         viewport.x = player.x - canvas.width / 2;
@@ -313,42 +358,55 @@ function startGame() {
         // Draw world
         drawWorld();
 
-        // Update player position
-        if (keys.up) player.y -= player.speed;
-        if (keys.left) player.x -= player.speed;
-        if (keys.down) player.y += player.speed;
-        if (keys.right) player.x += player.speed;
+        // Player logic
+        if (player.isAlive) {
+            // Update player position
+            if (keys.up) player.y -= player.speed;
+            if (keys.left) player.x -= player.speed;
+            if (keys.down) player.y += player.speed;
+            if (keys.right) player.x += player.speed;
 
-        // Boundary check
-        player.x = Math.max(player.size, Math.min(worldSize.width - player.size, player.x));
-        player.y = Math.max(player.size, Math.min(worldSize.height - player.size, player.y));
+            // Boundary check
+            player.x = Math.max(player.size, Math.min(worldSize.width - player.size, player.x));
+            player.y = Math.max(player.size, Math.min(worldSize.height - player.size, player.y));
 
-        // Safe house logic
-        const distToHouse = Math.sqrt(
-            Math.pow(player.x - safeHouse.x, 2) + 
-            Math.pow(player.y - safeHouse.y, 2)
-        );
-        
-        player.isSafe = distToHouse < safeHouse.safeRadius;
-        document.getElementById("safeStatus").textContent = 
-            player.isSafe ? "SAFE" : "DANGER";
-        document.getElementById("safeStatus").style.color = 
-            player.isSafe ? "#2ecc71" : "#e74c3c";
+            // Safe house logic
+            const distToHouse = Math.sqrt(
+                Math.pow(player.x - safeHouse.x, 2) + 
+                Math.pow(player.y - safeHouse.y, 2)
+            );
+            
+            player.isSafe = distToHouse < safeHouse.safeRadius;
+            document.getElementById("safeStatus").textContent = 
+                player.isSafe ? "SAFE" : "DANGER";
+            document.getElementById("safeStatus").style.color = 
+                player.isSafe ? "#2ecc71" : "#e74c3c";
 
-        // Auto-collect coins
-        assets.coins.forEach((coin) => {
-            if (!coin.collected) {
-                const dist = Math.sqrt(
-                    Math.pow(player.x - coin.x, 2) + 
-                    Math.pow(player.y - coin.y, 2)
-                );
-                if (dist < player.coinCollectionRange) {
-                    coin.collected = true;
-                    player.score += 5;
-                    updateUI();
+            // Auto-collect coins
+            assets.coins.forEach((coin) => {
+                if (!coin.collected) {
+                    const dist = Math.sqrt(
+                        Math.pow(player.x - coin.x, 2) + 
+                        Math.pow(player.y - coin.y, 2)
+                    );
+                    if (dist < player.coinCollectionRange) {
+                        coin.collected = true;
+                        player.score += 5;
+                        updateUI();
+                    }
                 }
+            });
+        } else {
+            // Respawn countdown
+            player.respawnTimer++;
+            if (player.respawnTimer > 180) { // 3 seconds at 60fps
+                respawnPlayer();
+                player.respawnTimer = 0;
             }
-        });
+        }
+
+        // Draw player (now has eyes for better visibility)
+        drawPlayer();
 
         // Update enemies
         enemies.forEach(enemy => {
@@ -371,8 +429,8 @@ function startGame() {
                 enemy.x += Math.cos(angle) * enemy.speed;
                 enemy.y += Math.sin(angle) * enemy.speed;
             }
-            // Return to original position if player not in view
-            else if (distToPlayer > enemy.viewRange || player.isSafe) {
+            // Return to original position if player not in view or dead
+            else if (distToPlayer > enemy.viewRange || player.isSafe || !player.isAlive) {
                 const angle = Math.atan2(
                     enemy.originalY - enemy.y, 
                     enemy.originalX - enemy.x
@@ -387,8 +445,8 @@ function startGame() {
                 enemy.x += Math.cos(angle) * moveDist;
                 enemy.y += Math.sin(angle) * moveDist;
             }
-            // Chase player if in view range
-            else {
+            // Chase player if in view range and alive
+            else if (player.isAlive) {
                 const angle = Math.atan2(
                     player.y - enemy.y, 
                     player.x - enemy.x
@@ -399,6 +457,9 @@ function startGame() {
                 // Attack if touching player
                 if (distToPlayer < player.size + enemy.size) {
                     player.health = Math.max(0, player.health - 0.5);
+                    if (player.health <= 0) {
+                        player.isAlive = false;
+                    }
                     updateUI();
                 }
             }
@@ -433,7 +494,7 @@ function startGame() {
         });
 
         // Heal when safe
-        if (player.isSafe && player.health < 100) {
+        if (player.isAlive && player.isSafe && player.health < 100) {
             player.health = Math.min(100, player.health + 0.1);
             updateUI();
         }
